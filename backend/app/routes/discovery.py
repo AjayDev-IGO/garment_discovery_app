@@ -1,6 +1,6 @@
 # app/routes/discovery.py
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Optional
 from datetime import date, datetime
@@ -35,13 +35,13 @@ def run_discovery(req: DiscoveryRequest) -> Dict:
     print(f"Received request: {req.dict()}") # For debugging
 
     try:
-        df = pd.read_csv(DATASET_PATH)
+        # Specify encoding to handle non-UTF-8 characters, typically 'latin-1' or 'cp1252'
+        df = pd.read_csv(DATASET_PATH, encoding='latin-1') 
         # FIX 1: Make date parsing robust. It should be 'DD-MM-YYYY' based on your CSV.
         df["timestamp"] = pd.to_datetime(df["timestamp"], format='%d-%m-%Y', errors='coerce')
         df.dropna(subset=['timestamp'], inplace=True)
     except Exception as e:
-        print(f"Error reading or parsing CSV: {e}")
-        return {"error": "Failed to process dataset"}, 500
+        raise HTTPException(status_code=500, detail={"error": f"Failed to process dataset: {str(e)}"})
 
     # --- Initial Filtering ---
     start_date = pd.to_datetime(req.timeline.start)
@@ -54,12 +54,17 @@ def run_discovery(req: DiscoveryRequest) -> Dict:
         (df["timestamp"] <= end_date)
     )
     
+    # NEW CODE (More robust handling of empty lists for filtering)
     if req.optional:
-        # ✨ FIX 2: Check if the lists actually contain items before filtering.
-        if req.optional.colors and len(req.optional.colors) > 0:
-            mask &= df["color"].str.lower().isin([c.lower() for c in req.optional.colors])
-        if req.optional.patterns and len(req.optional.patterns) > 0:
-            mask &= df["pattern"].str.lower().isin([p.lower() for p in req.optional.patterns])
+        # Check if colors list has content before applying filter
+        colors_to_filter = [c.lower() for c in req.optional.colors if c] if req.optional.colors else []
+        if colors_to_filter:
+            mask &= df["color"].str.lower().isin(colors_to_filter)
+            
+        # Check if patterns list has content before applying filter
+        patterns_to_filter = [p.lower() for p in req.optional.patterns if p] if req.optional.patterns else []
+        if patterns_to_filter:
+            mask &= df["pattern"].str.lower().isin(patterns_to_filter)
             
     filtered_df = df[mask].copy()
 
