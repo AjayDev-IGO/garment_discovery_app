@@ -1,5 +1,3 @@
-import React from 'react';
-
 function GarmentDetailsCard({ item }: { item: any }) {
   if (!item) return null;
 
@@ -11,9 +9,9 @@ function GarmentDetailsCard({ item }: { item: any }) {
     : [];
 
   return (
-    <div className="border rounded-md p-4 bg-white shadow">
+    <div className="rounded-md p-4 card">
       {/* Left: GarmentViewer Placeholder */}
-      <div className="border rounded-md p-4 bg-gray-100 h-64 flex items-center justify-center">
+      <div className="card h-64 flex items-center justify-center">
         {item.image_url ? (
           <img
             src={`http://localhost:8000${item.image_url}`}
@@ -25,7 +23,7 @@ function GarmentDetailsCard({ item }: { item: any }) {
         )}
       </div>
       {/* Right: Breakdown */}
-      <div className="mt-4">
+      <div className="mt-4 card rounded-md p-4">
         <h3 className="font-semibold mb-2">Garment Breakdown</h3>
         <p><b>Type:</b> {item.garment_type}</p>
         <div className="mb-2">

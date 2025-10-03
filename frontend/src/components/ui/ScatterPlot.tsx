@@ -35,12 +35,12 @@ function ScatterPlot({ items, onSelect }: { items: GarmentGroup[]; onSelect: (it
       if (items && items.length > 0) {
         const dailyCounts: { [key: string]: number } = {};
         const processedData = items.map(group => {
-        const dateKey = new Date(group.timestamp).toISOString().split("T")[0];
-        dailyCounts[dateKey] = (dailyCounts[dateKey] || 0) + 1;
-        return {
-          x: new Date(group.timestamp),
-          y: group.engagement_metric_avg,   // ✅ y-axis based on engagement metric
-            z: group.engagement_metric_avg,   // still keep for dot size
+          const dateKey = new Date(group.timestamp).toISOString().split("T")[0];
+          dailyCounts[dateKey] = (dailyCounts[dateKey] || 0) + 1;
+          return {
+            x: new Date(group.timestamp),
+            y: group.engagement_metric_avg,
+            z: group.engagement_metric_avg,
             items: group.items,
             item_count: group.item_count,
             color: group.items[0]?.color?.toLowerCase() || "#8884d8",
@@ -49,7 +49,7 @@ function ScatterPlot({ items, onSelect }: { items: GarmentGroup[]; onSelect: (it
             influence: group.items[0]?.influence_identifier,
           };
         });
-        
+
         // ✅ Apply filters
         const filtered = processedData.filter(d => {
           return (
@@ -59,7 +59,7 @@ function ScatterPlot({ items, onSelect }: { items: GarmentGroup[]; onSelect: (it
           );
         });
 
-        setChartData(filtered); // Fixed: Use filtered data instead of processedData
+        setChartData(filtered);
 
         // 🔗 Build connection lines only if showConnections is true
         if (showConnections) {
@@ -103,11 +103,11 @@ function ScatterPlot({ items, onSelect }: { items: GarmentGroup[]; onSelect: (it
   }
 
   return (
-    <div className="p-4 border rounded-lg mb-6 bg-white shadow">
+    <div className="p-4 border rounded-lg mb-6 card">
       <div className="flex gap-4">
         {/* 📌 Filter Sidebar */}
-        <div className="w-64 p-4 border rounded-lg bg-gray-50 shadow-sm">
-          <h4 className="font-semibold mb-3">Filters</h4>
+        <div className="w-64 p-4 border rounded-lg card">
+          <h4 className="font-semibold mb-3 text-foreground">Filters</h4>
           <div className="space-y-3">
             <div>
               <Label htmlFor="color">Color</Label>
@@ -194,11 +194,11 @@ function ScatterPlot({ items, onSelect }: { items: GarmentGroup[]; onSelect: (it
                 y: chartData.map(d => d.y),
                 text: chartData.map(
                   d => `
-                    <b>Date:</b> ${d.x.toLocaleDateString()}
-                    <b>Pattern:</b> ${d.pattern}
-                    <b>Color:</b> ${d.color}
-                    <b>Fit:</b> ${d.fit}
-                    <b>Engagement:</b> ${d.z.toFixed(2)}
+                    <b>Date:</b> ${d.x.toLocaleDateString()}<br>
+                    <b>Pattern:</b> ${d.pattern}<br>
+                    <b>Color:</b> ${d.color}<br>
+                    <b>Fit:</b> ${d.fit}<br>
+                    <b>Engagement:</b> ${d.z.toFixed(2)}<br>
                     <b>Items in Group:</b> ${d.item_count}
                   `
                 ),
@@ -206,7 +206,7 @@ function ScatterPlot({ items, onSelect }: { items: GarmentGroup[]; onSelect: (it
                 marker: {
                   size: chartData.map(d => Math.max(1, Math.sqrt(d.z) * 0.1)),
                   color: chartData.map(d => d.color),
-                  line: { width: 0.5, color: "#333" },
+                  line: { width: 1, color: "#333" },
                 },
                 hoverinfo: "text",
                 type: "scatter",
@@ -217,9 +217,16 @@ function ScatterPlot({ items, onSelect }: { items: GarmentGroup[]; onSelect: (it
               autosize: true,
               height: 400,
               margin: { l: 40, r: 30, b: 40, t: 30 },
-              xaxis: { title: "Date", type: "date" },
-              yaxis: { visible: false },
-              hovermode: "closest",
+              xaxis: { title: "Date", type: "date", color: "hsl(var(--foreground))" },
+              yaxis: { visible: false, color: "hsl(var(--foreground))" },
+              hovermode: "x unified",
+              // hoverlabel: {
+              //   // bgcolor: "hsl(var(--card))",
+              //   font: { color: "hsl(var(--card-foreground))" },
+              //   bordercolor: "hsl(var(--border))",
+              //   align: "left",
+              //   namelength: -1, // Show full text without truncation
+              // },
             }}
             config={{
               responsive: true,
