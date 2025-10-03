@@ -6,12 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
 
 import ScatterPlot from "@/components/ui/ScatterPlot";
 
-// 🆕 New GarmentTable component to display multiple items
+// GarmentTable component to display multiple items
 function GarmentTable({ items, onSelectRow }: { items: any[]; onSelectRow: (index: number) => void }) {
   if (!items || items.length === 0) return null;
 
@@ -44,21 +44,21 @@ function GarmentTable({ items, onSelectRow }: { items: any[]; onSelectRow: (inde
   );
 }
 
-// 🆕 This is the new GarmentDetails component with navigation
+// This is the GarmentDetails component with navigation
 function GarmentDetails({ items, selectedIndex, onNavigate }: { items: any[]; selectedIndex: number; onNavigate: (direction: 'prev' | 'next') => void }) {
   if (!items || items.length === 0) return null;
   const item = items[selectedIndex];
 
-  // Normalize palette: pr+efer palette array, fallback to single color
+  // Normalize palette: prefer palette array, fallback to single color or comma-separated string
   const palette: string[] = Array.isArray(item.palette)
     ? item.palette
     : item.color
-    ? [item.color]
+    ? (typeof item.color === 'string' ? item.color.split(',').map((c: string)=> c.trim()) : [item.color])
     : [];
 
   return (
     <div className="mt-6">
-      {/* 🆕 Add the navigation controls */}
+      {/* Add the navigation controls */}
       {items.length > 1 && (
         <div className="flex justify-between items-center mb-4">
           <Button variant="outline" onClick={() => onNavigate('prev')} disabled={selectedIndex === 0}>
@@ -75,9 +75,9 @@ function GarmentDetails({ items, selectedIndex, onNavigate }: { items: any[]; se
       {/* Garment Details grid */}
       <div className="grid grid-cols-2 gap-6">
         {/* Left: Breakdown */}
-        <div className="border rounded-md p-4 bg-white shadow">
+        <div className="border rounded-md p-4 card">
           <h3 className="font-semibold mb-2">Garment Breakdown</h3>
-          <p><b>Type:</b> {item.garment_type}</p>
+          <p><b>Type:</b> {item.garment_type}</p><br/>
           <div className="mb-2">
             <b>Colors:</b>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -89,23 +89,29 @@ function GarmentDetails({ items, selectedIndex, onNavigate }: { items: any[]; se
                       style={{ backgroundColor: c }}
                       title={c}
                     />
-                    <span className="text-sm">{c}</span>
+                    <span className="text-sm">{c}</span><br/>
                   </div>
                 ))
               ) : (
-                <span className="text-gray-500 ml-2">No color info</span>
+                <span className="text-gray-500 ml-2">No color info<br/></span>
               )}
             </div>
           </div>
-          <p><b>Pattern:</b> {item.pattern}</p>
-          <p><b>Style:</b> {item.style}</p>
+          <p><b>Pattern:</b> {item.pattern}</p><br/>
+          <p><b>Style:</b> {item.style}</p><br/>
+          <p><b>Fit:</b> {item.fit}</p><br/>
+          <p><b>Length:</b> {item.length}</p><br/>
+          <p><b>Neckline:</b> {item.neckline}</p><br/>
+          <p><b>Sleeve:</b> {item.sleeve}</p><br/>
+          <p><b>Fabric:</b> {item.fabric}</p><br/>
+          <p><b>Influenced By:</b> {item.influence_type} :<br/>{item.influence_identifier}</p><br/>
           <p>
-            <b>Engagement:</b> {item.engagement_likes} likes /{" "}
+            <b>Engagement:</b> {item.engagement_likes} likes / {item.engagement_comments} comments /{" "}
             {item.engagement_views} views
           </p>
         </div>
         {/* Right: GarmentViewer Placeholder */}
-        <div className="border rounded-md p-4 bg-gray-100 h-64 flex items-center justify-center">
+        <div className="border card rounded-md p-4 h-90 flex items-center justify-center">
           {item.image_url ? (
             <img
               src={`http://localhost:8000${item.image_url}`}
@@ -176,6 +182,23 @@ const GARMENT_ATTRIBUTES = {
   fabrics: ["Cotton", "Polyester", "Rayon", "Denim", "Linen", "Jersey", "Viscose", "Knits", "Blends"]
 };
 
+// Function to parse CSV content into JSON
+function parseCSV(text: string): any[] {
+  const lines = text.trim().split('\n');
+  const headers = lines[0].split(',').map(h => h.trim());
+  const data: any[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    const values = lines[i].split(',').map(v => v.trim());
+    const obj: any = {};
+    for (let j = 0; j < headers.length; j++) {
+      obj[headers[j]] = values[j] || '';
+    }
+    data.push(obj);
+  }
+  return data;
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState("discovery");
 
@@ -228,6 +251,26 @@ function App() {
   // validation state
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submittedAttempt, setSubmittedAttempt] = useState(false);
+
+  // 🔹 Agent 0 states
+  const [selectedSources, setSelectedSources] = useState<string[]>([]);
+  const [accountIds, setAccountIds] = useState<Record<string, string[]>>({ Instagram: [], Facebook: [], YouTube: [] });
+  const [urls, setUrls] = useState<Record<string, string[]>>({ Cinema: [], Celebrities: [], Marketplace: [] });
+  const [newAccountId, setNewAccountId] = useState<Record<string, string>>({ Instagram: '', Facebook: '', YouTube: '' });
+  const [newUrl, setNewUrl] = useState<Record<string, string>>({ Cinema: '', Celebrities: '', Marketplace: '' });
+  const [isScraping, setIsScraping] = useState(false);
+  const [scrapeOutput, setScrapeOutput] = useState<any>(null);
+  const [scrapeDatasetUrl, setScrapeDatasetUrl] = useState<string | null>(null);
+  const [showScrapeOutput, setShowScrapeOutput] = useState(false);
+
+  // 🔹 Agent 1 offline dataset state
+  const [discoveryDataset, setDiscoveryDataset] = useState<{ type: 'url' | 'files', data: string | File[] } | null>(null);
+
+  // 🔹 Agent 3 states
+  const [selected3DImage, setSelected3DImage] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [show3DOutput, setShow3DOutput] = useState(false);
+  const [generated3DModel, setGenerated3DModel] = useState<string | null>(null);
 
   // 🔹 Fetch garments from backend when gender changes
   useEffect(() => {
@@ -394,6 +437,16 @@ function App() {
     }
   };
 
+  // New handler for using in Agent 3 from Agent 2
+  const handleUseInAgent3 = () => {
+    if (predictorSelectedItems.length > 0 && predictorSelectedItems[predictorSelectedItemIndex].image_url) {
+      const item = predictorSelectedItems[predictorSelectedItemIndex];
+      setSelected3DImage(`http://localhost:8000${item.image_url}`);
+      setActiveTab("3d_generator");
+      setShowPredictorOutput(false);
+    }
+  };
+
   // Create a new validation function for the predict form
   const validatePredictForm = (): boolean => {
     const e: Record<string, string> = {};
@@ -404,8 +457,31 @@ function App() {
     return Object.keys(e).length === 0;
   };
 
-  const handlePredictorItemSelect = (items: any[]) => {
-    setPredictorSelectedItems(items);
+  // Update handlePredictorItemSelect to generate images if needed
+  const handlePredictorItemSelect = async (items: any[]) => {
+    const updatedItems = await Promise.all(
+      items.map(async (item) => {
+        if (item.image_url === null) {
+          const description = `A high-quality image of a ${item.color} ${item.pattern} ${item.fit} ${item.style} ${item.garment_type} with ${item.neckline} neckline, ${item.sleeve} sleeves, ${item.length} length, made of ${item.fabric}. Realistic fashion photo.`;
+          try {
+            const res = await fetch('http://localhost:8000/predictor/generate_image', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ description }),
+            });
+            if (res.ok) {
+              const data = await res.json();
+              item.image_url = data.image_url;
+            }
+          } catch (error) {
+            console.error('Error generating image:', error);
+            item.image_url = '/images/placeholder.jpg';
+          }
+        }
+        return item;
+      })
+    );
+    setPredictorSelectedItems(updatedItems);
     setPredictorSelectedItemIndex(0);
   };
 
@@ -421,146 +497,54 @@ function App() {
       });
   };
 
+  // Update handlePredict to use backend and handle upload if needed
   const handlePredict = async () => {
     setSubmittedPredictAttempt(true);
-    const ok = validatePredictForm();
-    if (!ok) {
-      return;
-    }
+    if (!validatePredictForm()) return;
 
-    // --- Start of Mock Data for Demo ---
-    const mockPredictorResults = [
-      {
-        id: "predicted_1",
-        garment_type: "Kurta",
-        color: "blue",
-        pattern: "checks",
-        style: "casual",
-        engagement_likes: 2500,
-        engagement_views: 12000,
-        timestamp: "2025-10-01T10:00:00Z",
-        source: "Instagram",
-        image_url: "",
-        influence : "SS"
-      },
-      {
-        id: "predicted_2",
-        garment_type: "T-Shirt",
-        color: "red",
-        pattern: "stripes",
-        style: "athleisure",
-        engagement_likes: 5000,
-        engagement_views: 25000,
-        timestamp: "2025-10-10T10:00:00Z",
-        source: "YouTube",
-        image_url: "",
-        influence : "SS"
-      },
-      {
-        id: "predicted_3",
-        garment_type: "Jeans",
-        color: "blue",
-        pattern: "solid",
-        style: "casual",
-        engagement_likes: 1500,
-        engagement_views: 8000,
-        timestamp: "2025-10-20T10:00:00Z",
-        source: "Facebook",
-        image_url: "",
-        influence : "SS"
-      },
-      {
-        id: "predicted_4",
-        garment_type: "Jacket",
-        color: "black",
-        pattern: "solid",
-        style: "streetwear",
-        engagement_likes: 4500,
-        engagement_views: 20000,
-        timestamp: "2025-11-05T10:00:00Z",
-        source: "Celebrities",
-        image_url: "",
-        influence : "SS"
-      },
-      {
-        id: "predicted_5",
-        garment_type: "Dress",
-        color: "green",
-        pattern: "floral",
-        style: "bohemian",
-        engagement_likes: 3000,
-        engagement_views: 15000,
-        timestamp: "2025-11-15T10:00:00Z",
-        source: "Cinema",
-        image_url: "",
-        influence : "SS"
-      },
-      // You'll need more mock data to populate the graph
-      // Add more items here with 'timestamp' and 'source' properties.
-      {
-        id: "predicted_6",
-        garment_type: "Jeans",
-        color: "blue",
-        pattern: "solid",
-        style: "casual",
-        engagement_likes: 1500,
-        engagement_views: 8000,
-        image_url: "",
-        timestamp: "2025-10-01T10:00:00Z",
-        source: "Instagram",
-        influence : "SS"
-      },
-      {
-        id: "predicted_7",
-        garment_type: "Jacket",
-        color: "black",
-        pattern: "solid",
-        style: "streetwear",
-        engagement_likes: 4500,
-        engagement_views: 20000,
-        image_url: "",
-        timestamp: "2025-10-15T10:00:00Z",
-        source: "YouTube",
-        influence : "SS"
-      },
-      {
-        id: "predicted_8",
-        garment_type: "Dress",
-        color: "green",
-        pattern: "floral",
-        style: "bohemian",
-        engagement_likes: 3000,
-        engagement_views: 15000,
-        image_url: "",
-        timestamp: "2025-11-05T10:00:00Z",
-        source: "Celebrities",
-        influence : "SS"
-      },
-    ];
-    // --- End of Mock Data ---
+    try {
+      let dataset_path = '';
+      if (datasetToPredict?.type === 'url') {
+        dataset_path = datasetToPredict.data as string;
+      } else if (datasetToPredict?.type === 'files') {
+        const formData = new FormData();
+        (datasetToPredict.data as File[]).forEach(file => formData.append('files', file));
+        const uploadRes = await fetch('http://localhost:8000/predictor/upload_dataset', {
+          method: 'POST',
+          body: formData,
+        });
+        if (!uploadRes.ok) throw new Error('Upload failed');
+        const uploadData = await uploadRes.json();
+        dataset_path = uploadData.dataset_url;
+      }
 
-    const transformedResults = mockPredictorResults.map(item => ({
-        timestamp: item.timestamp,
-        items: [item], // Wrap the single item in an array
-        engagement_metric_avg: (item.engagement_likes + item.engagement_views) / 2, // Simple average for the demo
-        item_count: 1, // Count is 1 since it's a single item for now
-    }));
-
-    // Update state with mock data
-    setPredictorResults(transformedResults);
-    setPredictorSelectedItems(mockPredictorResults.length > 0 ? [mockPredictorResults[0]] : []);
-    setPredictorSelectedItemIndex(0);
+      const res = await fetch('http://localhost:8000/predictor/predict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dataset_path,
+          prediction_date: predictionDate,
+          geography: predictionGeography,
+          target_group: targetGroup,
+        }),
+      });
+      if (!res.ok) throw new Error('Prediction failed');
+      const data = await res.json();
+      setPredictorResults(data.results);
     setShowPredictorOutput(true);
+  } catch (error) {
+      console.error("Error predicting:", error);
+    }
   };
 
-  // 🆕 Handler for selecting a single item from the scatter plot
+  // Handler for selecting a single item from the scatter plot
   const handleItemSelect = (items: any[]) => {
     console.log("Items selected from scatter plot:", items);
     setSelectedItems(items);
     setSelectedItemIndex(0); // Reset to the first item on new selection
   };
 
-  // 🆕 Handler for navigation through the selected items
+  // Handler for navigation through the selected items
   const handleItemNavigate = (direction: 'prev' | 'next') => {
     setSelectedItemIndex(prevIndex => {
       if (direction === 'next' && prevIndex < selectedItems.length - 1) {
@@ -612,6 +596,107 @@ function App() {
     </Popover>
   );
 
+  // Agent 0 handlers
+  const toggleSource = (src: string) => {
+    setSelectedSources(prev => prev.includes(src) ? prev.filter(s => s !== src) : [...prev, src]);
+  };
+
+  const addAccountId = (src: string) => {
+    const id = newAccountId[src].trim();
+    if (id && !accountIds[src].includes(id)) {
+      setAccountIds(prev => ({ ...prev, [src]: [...prev[src], id] }));
+      setNewAccountId(prev => ({ ...prev, [src]: '' }));
+    }
+  };
+
+  const removeAccountId = (src: string, id: string) => {
+    setAccountIds(prev => ({ ...prev, [src]: prev[src].filter(i => i !== id) }));
+  };
+
+  const addUrl = (src: string) => {
+    const url = newUrl[src].trim();
+    if (url && !urls[src].includes(url)) {
+      setUrls(prev => ({ ...prev, [src]: [...prev[src], url] }));
+      setNewUrl(prev => ({ ...prev, [src]: '' }));
+    }
+  };
+
+  const removeUrl = (src: string, u: string) => {
+    setUrls(prev => ({ ...prev, [src]: prev[src].filter(url => url !== u) }));
+  };
+
+  const handleScrape = async () => {
+    setIsScraping(true);
+
+    const payload: any = {};
+    selectedSources.forEach(src => {
+      if (['Instagram', 'Facebook', 'YouTube'].includes(src)) {
+        payload[src] = accountIds[src];
+      } else {
+        payload[src] = urls[src];
+      }
+    });
+
+    console.log('Scrape payload:', payload);
+
+    try {
+      const res = await fetch('http://localhost:8000/data/social_mock_data.csv');
+      if (!res.ok) {
+        throw new Error('Failed to fetch CSV file');
+      }
+      const text = await res.text();
+      const parsedData = parseCSV(text);
+      const datasetUrl = '/data/social_mock_data.csv';
+
+      setScrapeOutput(parsedData);
+      setScrapeDatasetUrl(datasetUrl);
+      setShowScrapeOutput(true);
+    } catch (error) {
+      console.error('Error fetching CSV:', error);
+      alert('Failed to load mock data. Check console for details and ensure the backend serves /data/social_mock_data.csv.');
+    } finally {
+      setIsScraping(false);
+    }
+  };
+
+  const handleDiscoveryFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const filesArray = Array.from(e.target.files);
+      const nonCsvFiles = filesArray.filter(file => file.type !== 'text/csv');
+      if (nonCsvFiles.length > 0) {
+        setErrors(prev => ({ ...prev, file: 'Only CSV files are allowed.' }));
+        setDiscoveryDataset(null);
+      } else {
+        setErrors(prev => ({ ...prev, file: '' }));
+        setDiscoveryDataset({ type: 'files', data: filesArray });
+      }
+    }
+  };
+
+  // Handler for Agent 3 image change
+  const handle3DImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setSelected3DImage(URL.createObjectURL(file));
+    }
+  };
+
+  // Handler for generating 3D
+  const handleGenerate3D = async () => {
+    if (!selected3DImage) {
+      // Show error or return
+      return;
+    }
+    setIsGenerating(true);
+    setShow3DOutput(true);
+
+    // Simulate generation process (replace with actual API call later)
+    setTimeout(() => {
+      setIsGenerating(false);
+      setGenerated3DModel('model_03.p3d'); // Placeholder for generated model
+    }, 3000);
+  }
+
   return (
     <div className="bg-background text-foreground min-h-screen p-6">
       {/* Top Tabs */}
@@ -624,10 +709,103 @@ function App() {
           <TabsTrigger value="pdp_creator">Agent 4: PDP Creator</TabsTrigger>
         </TabsList>
 
-        {/* Agent 0: Scraper (placeholder) */}
+        {/* Agent 0: Scraper */}
         <TabsContent value="scraper">
-          <h1 className="text-2xl font-bold mb-4">Agent 0: Scraper</h1>
-          <p className="text-muted-foreground">This tab is a placeholder for the Scraper functionality.</p>
+          {!showScrapeOutput ? (
+            <>
+              <h1 className="text-2xl font-bold mb-4">Agent 0: Scraper</h1>
+              <div className="space-y-4">
+                <div>
+                  <Label>Sources</Label>
+                  <div className="flex flex-col gap-2 mt-2">
+                    {["Instagram", "Facebook", "YouTube", "Cinema", "Celebrities", "Marketplace"].map((src) => (
+                      <div key={src}>
+                        <label className="flex items-center gap-2">
+                          <Checkbox
+                            checked={selectedSources.includes(src)}
+                            onCheckedChange={() => toggleSource(src)}
+                          /> {src}
+                        </label>
+                        {selectedSources.includes(src) && (
+                          <div className="ml-6 mt-2">
+                            {['Instagram', 'Facebook', 'YouTube'].includes(src) ? (
+                              <>
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    placeholder={`Add account ID for ${src}`}
+                                    value={newAccountId[src]}
+                                    onChange={(e) => setNewAccountId(prev => ({ ...prev, [src]: e.target.value }))}
+                                  />
+                                  <Button onClick={() => addAccountId(src)}>Add</Button>
+                                </div>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {accountIds[src].map(id => (
+                                    <div key={id} className="bg-gray-500 px-2 py-1 rounded flex items-center gap-1">
+                                      {id}
+                                      <button onClick={() => removeAccountId(src, id)} className="text-red-500">x</button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    placeholder={`Add URL for ${src}`}
+                                    value={newUrl[src]}
+                                    onChange={(e) => setNewUrl(prev => ({ ...prev, [src]: e.target.value }))}
+                                  />
+                                  <Button onClick={() => addUrl(src)}>Add</Button>
+                                </div>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {urls[src].map(u => (
+                                    <div key={u} className="bg-gray-200 px-2 py-1 rounded flex items-center gap-1">
+                                      {u}
+                                      <button onClick={() => removeUrl(src, u)} className="text-red-500">x</button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="mt-6">
+                  <Button className="w-full" onClick={handleScrape} disabled={isScraping}>
+                    {isScraping ? 'Scraping...' : 'Scrape →'}
+                  </Button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <h1 className="text-2xl font-bold mb-4">Scrape Output</h1>
+              <pre className="bg-gray-100 p-4 overflow-auto">
+                {JSON.stringify(scrapeOutput, null, 2)}
+              </pre>
+              <div className="mt-4 flex gap-4">
+                <Button onClick={() => setShowScrapeOutput(false)}>← Back to Form</Button>
+                <Button variant="secondary" onClick={() => {
+                  if (scrapeDatasetUrl) {
+                    const link = document.createElement("a");
+                    link.href = `http://localhost:8000${scrapeDatasetUrl}`;
+                    link.download = "scrape_data.csv";
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  }
+                }} disabled={!scrapeDatasetUrl}>⬇ Download Dataset</Button>
+                <Button variant="default" onClick={() => {
+                  setDiscoveryDataset({ type: 'url', data: scrapeDatasetUrl || '' });
+                  setActiveTab("discovery");
+                  setShowScrapeOutput(false);
+                }} disabled={!scrapeDatasetUrl}>Use in Agent 1 →</Button>
+              </div>
+            </>
+          )}
         </TabsContent>
 
         {/* Agent 1: Discovery */}
@@ -690,7 +868,7 @@ function App() {
                 {/* Sources */}
                 <div>
                   <Label>Sources</Label>
-                  <div className="flex flex-col gap-2 mt-2">
+                  <div className="flex flex-row gap-20 mt-2">
                     {["Instagram", "Facebook", "YouTube", "Cinema", "Celebrities", "Marketplace"].map((src) => (
                       <label key={src} className="flex items-center gap-2">
                         <Checkbox
@@ -862,7 +1040,19 @@ function App() {
                 {/* Offline Upload */}
                 <div>
                   <Label>Offline Data Upload</Label>
-                  <Input type="file"/>
+                  {discoveryDataset ? (
+                    <p className="text-sm text-gray-500 mt-1">
+                      Using dataset: {discoveryDataset.type === 'url' ? (
+                        <a href={`http://localhost:8000${discoveryDataset.data}`} target="_blank" rel="noopener noreferrer">
+                          {String(discoveryDataset.data).split('/').pop()}
+                        </a>
+                      ) : (
+                        (discoveryDataset.data as File[]).map(file => file.name).join(', ')
+                      )}
+                    </p>
+                  ) : (
+                    <Input type="file" multiple accept=".csv" onChange={handleDiscoveryFileChange} />
+                  )}
                 </div>
 
                 {/* Process Button */}
@@ -882,7 +1072,7 @@ function App() {
                 {/* Pass the new handler to ScatterPlot */}
                   <ScatterPlot items={results} onSelect={handleItemSelect} />
                   {selectedItems.length > 0 && <GarmentDetails items={selectedItems} selectedIndex={selectedItemIndex} onNavigate={handleItemNavigate} />}
-                  {/* 🆕 Render the new GarmentTable component below */}
+                  {/* Render the GarmentTable component below */}
                   {selectedItems.length > 1 && <GarmentTable items={selectedItems} onSelectRow={setSelectedItemIndex} />}
                 </>
               ) : (
@@ -1005,10 +1195,53 @@ function App() {
         )}
       </TabsContent>
 
-        {/* Agent 3: 3D generator (placeholder) */}
+        {/* Agent 3: 3D generator */}
         <TabsContent value="3d_generator">
-          <h1 className="text-2xl font-bold mb-4">Agent 3: 3D generator</h1>
-          <p className="text-muted-foreground">This tab is a placeholder for the 3D generator functionality.</p>
+          {!show3DOutput ? (
+            <>
+              <h1 className="text-2xl font-bold mb-4">Agent 3: 3D Generator</h1>
+              <div className="space-y-4">
+                <div>
+                  <Label>Add Image</Label>
+                  <Input type="file" accept="image/*" onChange={handle3DImageChange} />
+                  {selected3DImage && (
+                    <div className="mt-4">
+                      <img src={selected3DImage} alt="Selected for 3D" className="max-h-64 object-contain" />
+                    </div>
+                  )}
+                </div>
+                <div className="mt-6">
+                  <Button className="w-full" onClick={handleGenerate3D} disabled={!selected3DImage}>
+                    Generate 3D
+                  </Button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <h1 className="text-2xl font-bold mb-4">3D Generation Output</h1>
+              {isGenerating ? (
+                <p className="text-gray-500">Generating 3D model...</p>
+              ) : (
+                <div>
+                  {generated3DModel ? (
+                    <iframe
+                      src={`/viewer.html?file=${encodeURIComponent(generated3DModel)}`}
+                      width="100%"
+                      height="600"
+                      frameBorder="0"
+                      title="P3D Viewer"
+                    ></iframe>
+                  ) : (
+                    <p>No model generated yet.</p>
+                  )}
+                </div>
+              )}
+              <div className="mt-4 flex gap-4">
+                <Button onClick={() => { setShow3DOutput(false); setIsGenerating(false); }}>← Back</Button>
+              </div>
+            </>
+          )}
         </TabsContent>
 
         {/* Agent 4: PDP Creator (placeholder) */}
